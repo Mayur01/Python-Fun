@@ -1,0 +1,306 @@
+/* Template to create a s3 bucket to store the files and then using cloudfront for the continuous availability of the website 
+   on edge server. Bucket policy is given to the s3 bucket so it can accessed publicly.
+*/
+{
+
+    "AWSTemplateFormatVersion": "2010-09-09",
+
+    "Parameters": {
+
+        "Bucketname": {
+
+            "Type": "String",
+
+            "Description": "Create a s3 bucket using cloud formation"
+
+        },
+
+        "DomainName":{
+
+            "Type":"String",
+
+            "Description":"Specify the domain name for cloud front",
+
+            "Default":"roronovazoro.com"
+
+        }
+
+    },
+
+    "Resources":{
+
+        "s3bucket":{
+
+            "Type" : "AWS::S3::Bucket",
+
+            "Properties" : {
+
+                 "BucketName" : {
+
+                     "Ref":"Bucketname"
+
+                 },
+
+                 "Tags": [
+
+                    {
+
+                        "Key": "Owner",
+
+                        "Value": "mayur.khomane"
+
+                    },
+
+                    {
+
+                        "Key": "Environment",
+
+                        "Value": "testing"
+
+                    }
+
+                ]
+
+            }
+
+        },
+
+        "Cloudfrontdistribution":{
+
+            "Type":"AWS::CloudFront::Distribution",
+
+                        "Properties": {
+
+                "DistributionConfig": {
+
+                    "Aliases": [
+
+                        {
+
+                            "Ref": "DomainName"
+
+                        }
+
+                    ],
+
+                    "DefaultCacheBehavior": {
+
+                        "Compress": true,
+
+                        "ForwardedValues": {
+
+                            "QueryString": false
+
+                        },
+
+                        "TargetOriginId": "the-s3-bucket",
+
+                        "ViewerProtocolPolicy": "redirect-to-https"
+
+                    },
+
+                    "DefaultRootObject": "index.html",
+
+                    "CustomErrorResponses": [
+
+                        {
+
+                            "ErrorCachingMinTTL": 300,
+
+                            "ErrorCode": 403,
+
+                            "ResponseCode": 404,
+
+                            "ResponsePagePath": "/404.html"
+
+                        }
+
+                    ],
+
+                    "Enabled": true,
+
+                    "HttpVersion": "http2",
+
+                    "Origins": [
+
+                        {
+
+                            "DomainName": {
+
+                                "Fn::Join": [
+
+                                    "",
+
+                                    [
+
+                                        {
+
+                                            "Ref": "s3bucket"
+
+                                        },
+
+                                        ".s3.amazonaws.com"
+
+                                    ]
+
+                                ]
+
+                            },
+
+                            "Id": "the-s3-bucket",
+
+                            "S3OriginConfig": {
+
+                                "OriginAccessIdentity": {
+
+                                    "Fn::Join": [
+
+                                        "",
+
+                                        [
+
+                                            "origin-access-identity/cloudfront/",
+
+                                            {
+
+                                                "Ref": "TheCloudFrontOriginAccessIdentity"
+
+                                            }
+
+                                        ]
+
+                                    ]
+
+                                }
+
+                            }
+
+                        }
+
+                    ],
+
+                    "ViewerCertificate" : { "CloudFrontDefaultCertificate" : "true" }
+
+                },
+
+                "Tags": [
+
+                    {
+
+                        "Key": "Domain",
+
+                        "Value": {
+
+                            "Ref": "DomainName"
+
+                        }
+
+                    }
+
+                ]
+
+            }
+
+        },
+
+        "TheCloudFrontOriginAccessIdentity": {
+
+            "Type": "AWS::CloudFront::CloudFrontOriginAccessIdentity",
+
+            "Properties": {
+
+                "CloudFrontOriginAccessIdentityConfig": {
+
+                    "Comment": {
+
+                        "Fn::Sub": "CloudFront OAI for ${DomainName}"
+
+                    }
+
+                }
+
+            }
+
+        },
+
+        "TheBucketPolicy": {
+
+            "Type": "AWS::S3::BucketPolicy",
+
+            "Properties": {
+
+                "Bucket": {
+
+                    "Ref": "s3bucket"
+
+                },
+
+                "PolicyDocument": {
+
+                    "Statement": [
+
+                        {
+
+                            "Action": [
+
+                                "s3:GetObject"
+
+                            ],
+
+                            "Effect": "Allow",
+
+                            "Resource": {
+
+                                "Fn::Join": [
+
+                                    "",
+
+                                    [
+
+                                        "arn:aws:s3:::",
+
+                                        {
+
+                                            "Ref": "s3bucket"
+
+                                        },
+
+                                        "/*"
+
+                                    ]
+
+                                ]
+
+                            },
+
+                            "Principal": {
+
+                                "CanonicalUser": {
+
+                                    "Fn::GetAtt": [
+
+                                        "TheCloudFrontOriginAccessIdentity",
+
+                                        "S3CanonicalUserId"
+
+                                    ]
+
+                                }
+
+                            }
+
+                        }
+
+                    ]
+
+                }
+
+            }
+
+        }
+
+
+
+    }
+
+}
